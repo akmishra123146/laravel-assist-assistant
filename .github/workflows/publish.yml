@@ -1,0 +1,29 @@
+name: Publish to Packagist
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+
+      - name: Validate composer.json
+        run: composer validate --strict
+
+      - name: Notify Packagist
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -d '{"repository":{"url":"https://github.com/laravel-assist/assistant"}}' \
+            https://packagist.org/api/update-package/laravel-assist/assistant
