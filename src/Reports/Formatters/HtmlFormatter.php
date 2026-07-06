@@ -1,0 +1,143 @@
+<?php
+
+namespace LaravelAssist\Assistant\Reports\Formatters;
+
+use Illuminate\Support\Facades\Blade;
+use LaravelAssist\Assistant\Contracts\FormatterInterface;
+
+class HtmlFormatter implements FormatterInterface
+{
+    public function format(array $result): string
+    {
+        $findings = $result['findings'] ?? [];
+        $summary = $result['summary'] ?? [];
+
+        $score = $this->calculateScore($summary);
+        $date = now()->format('Y-m-d H:i:s');
+
+        $criticalFindings = array_filter($findings, fn ($f) => $f['severity'] === 'critical');
+        $warningFindings = array_filter($findings, fn ($f) => $f['severity'] === 'warning');
+        $infoFindings = array_filter($findings, fn ($f) => $f['severity'] === 'info');
+
+        $findingsHtml = '';
+        foreach ($findings as $finding) {
+            $severityClass = match ($finding['severity']) {
+                'critical' => 'critical',
+                'warning' => 'warning',
+                'info' => 'info',
+                default => '',
+            };
+
+            $findingsHtml .= <<<HTML
+            <tr class="finding {$severityClass}">
+                <td><span class="badge {$severityClass}">{$finding['severity']}</span></td>
+                <td>{$finding['type']}</td>
+                <td>{$finding['message']}</td>
+                <td>{$finding['file']}:{$finding['line']}</td>
+                <td>{$finding['recommendation']}</td>
+            </tr>
+HTML;
+        }
+
+        $scoreClass = match (true) {
+            $score >= 80 => 'good',
+            $score >= 50 => 'warning',
+            default => 'critical',
+        };
+
+        return <<<HTML
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laravel Assistant - Health Report</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { background: #fff; padding: 30px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .header h1 { color: #1a1a1a; margin-bottom: 10px; }
+        .header p { color: #666; }
+        .score-card { display: flex; gap: 20px; margin-bottom: 20px; }
+        .card { flex: 1; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
+        .card .number { font-size: 36px; font-weight: bold; }
+        .card .label { color: #666; margin-top: 5px; }
+        .card.good .number { color: #22c55e; }
+        .card.warning .number { color: #f59e0b; }
+        .card.critical .number { color: #ef4444; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        th { background: #1a1a1a; color: #fff; padding: 12px; text-align: left; }
+        td { padding: 12px; border-bottom: 1px solid #eee; }
+        tr:hover { background: #f9f9f9; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; text-transform: uppercase; }
+        .badge.critical { background: #fecaca; color: #991b1b; }
+        .badge.warning { background: #fef3c7; color: #92400e; }
+        .badge.info { background: #dbeafe; color: #1e40af; }
+        .footer { text-align: center; padding: 20px; color: #999; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Laravel Assistant - Health Report</h1>
+            <p>Generated on {$date}</p>
+        </div>
+
+        <div class="score-card">
+            <div class="card {$scoreClass}">
+                <div class="number">{$score}/100</div>
+                <div class="label">Health Score</div>
+            </div>
+            <div class="card">
+                <div class="number">{$summary['total']}</div>
+                <div class="label">Total Findings</div>
+            </div>
+            <div class="card">
+                <div class="number">{$summary['critical']}</div>
+                <div class="label">Critical Issues</div>
+            </div>
+            <div class="card">
+                <div class="number">{$summary['warning']}</div>
+                <div class="label">Warnings</div>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Severity</th>
+                    <th>Type</th>
+                    <th>Message</th>
+                    <th>Location</th>
+                    <th>Recommendation</th>
+                </tr>
+            </thead>
+            <tbody>
+                {$findingsHtml}
+            </tbody>
+        </table>
+
+        <div class="footer">
+            <p>Generated by Laravel Assistant</p>
+        </div>
+    </div>
+</body>
+</html>
+HTML;
+    }
+
+    protected function calculateScore(array $summary): int
+    {
+        if ($summary['total'] === 0) {
+            return 100;
+        }
+
+        $score = 100;
+        $score -= $summary['critical'] * 15;
+        $score -= $summary['warning'] * 5;
+        $score -= $summary['info'] * 1;
+
+        return max(0, min(100, $score));
+    }
+}
