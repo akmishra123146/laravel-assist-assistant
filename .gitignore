@@ -1,0 +1,15 @@
+/vendor/
+composer.lock
+.phpunit.result.cache
+.phpstan-cache
+.DS_Store
+*.swp
+*.swo
+*~
+.env
+.env.backup
+coverage/
+build/
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
